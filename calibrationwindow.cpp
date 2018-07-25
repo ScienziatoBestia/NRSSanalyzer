@@ -59,9 +59,9 @@ CalibrationWindow::CalibrationWindow(const TGWindow *p, const TGWindow *main, UI
     TGHorizontalFrame *h2frame = new TGHorizontalFrame(fMain,w,200);
     fEcanvas = new TRootEmbeddedCanvas("Ecanvas",h2frame,w/2,200);
 
-    static Int_t wid = fEcanvas->GetCanvasWindowId();
+   /* static Int_t wid = fEcanvas->GetCanvasWindowId();
     TCanvas *fCanvas = new TCanvas("MyCanvas", 100,100,wid);
-    fEcanvas->AdoptCanvas(fCanvas);
+    fEcanvas->AdoptCanvas(fCanvas);*/
     h2frame->AddFrame(fEcanvas, new TGLayoutHints(kLHintsExpandX | kLHintsExpandY, 10,10));
 
     textView = new TGTextView (h2frame, w/2,200);

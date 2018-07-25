@@ -144,20 +144,20 @@ MainWindow::MainWindow(const TGWindow *p,UInt_t w,UInt_t h)
     TGVerticalFrame *fCanvasVFrame = new TGVerticalFrame(fHorizontalFrame0);
 
     TGHorizontalFrame *fCanvasHFrame1 = new TGHorizontalFrame(fCanvasVFrame);
-    TRootEmbeddedCanvas *BaF1Canvas = new TRootEmbeddedCanvas("BaF1Canvas", fCanvasHFrame1, 200, 200);
-    fCanvasHFrame1->AddFrame(BaF1Canvas, canvasLayoutHints);
+    fBaF1Canvas = new TRootEmbeddedCanvas("BaF1Canvas", fCanvasHFrame1, 200, 200);
+    fCanvasHFrame1->AddFrame(fBaF1Canvas, canvasLayoutHints);
 
-    TRootEmbeddedCanvas *BaF2Canvas = new TRootEmbeddedCanvas("BaF2Canvas", fCanvasHFrame1, 200, 200);
-    fCanvasHFrame1->AddFrame(BaF2Canvas, canvasLayoutHints);
+    fBaF2Canvas = new TRootEmbeddedCanvas("BaF2Canvas", fCanvasHFrame1, 200, 200);
+    fCanvasHFrame1->AddFrame(fBaF2Canvas, canvasLayoutHints);
 
     fCanvasVFrame->AddFrame(fCanvasHFrame1, canvasLayoutHints);
 
     TGHorizontalFrame *fCanvasHFrame2 = new TGHorizontalFrame(fCanvasVFrame);
-    TRootEmbeddedCanvas *BaF3Canvas = new TRootEmbeddedCanvas("BaF3Canvas", fCanvasHFrame2, 200, 200);
-    fCanvasHFrame2->AddFrame(BaF3Canvas, canvasLayoutHints);
+    fBaF3Canvas = new TRootEmbeddedCanvas("BaF3Canvas", fCanvasHFrame2, 200, 200);
+    fCanvasHFrame2->AddFrame(fBaF3Canvas, canvasLayoutHints);
 
-    TRootEmbeddedCanvas *BaF4Canvas = new TRootEmbeddedCanvas("BaF4Canvas", fCanvasHFrame2, 200, 200);
-    fCanvasHFrame2->AddFrame(BaF4Canvas, canvasLayoutHints);
+    fBaF4Canvas = new TRootEmbeddedCanvas("BaF4Canvas", fCanvasHFrame2, 200, 200);
+    fCanvasHFrame2->AddFrame(fBaF4Canvas, canvasLayoutHints);
 
     fCanvasVFrame->AddFrame(fCanvasHFrame2, canvasLayoutHints);
 
@@ -315,9 +315,38 @@ void MainWindow::visualization()
     //Baf1 visualization
     if(fBaF1ScintCheckButton->IsOn() && !fBaF1CherenkovCheckButton->IsOn() ){
         fBaF1CountsNumberEntry->SetNumber(fNBaF1Scint);
+        TCanvas *fCanvas1 = fBaF1Canvas->GetCanvas();
+        fCanvas1->cd();
+        fSumSignalCh[0].SetLineColor(2);
+        fSumSignalCh[0].Draw();
+        for(int i=0; i< fNCalPointsCh[0]; i++)
+        {
+            TLine *timeLine = new TLine(fCalibrationTimeCh[0]->at(i), fSumSignalCh[0].GetMinimum(), fCalibrationTimeCh[0]->at(i), fSumSignalCh[0].GetMaximum());
+            timeLine->SetLineColor(12);
+            timeLine->SetLineWidth(2);
+            timeLine->SetLineStyle(7);
+            timeLine->Draw("same");
+        }
+
+        fCanvas1->Modified();
+        fCanvas1->Update();
     }
     else if(!fBaF1ScintCheckButton->IsOn() && fBaF1CherenkovCheckButton->IsOn()){
         fBaF1CountsNumberEntry->SetNumber(fNBaF1Cher);
+        TCanvas *fCanvas1 = fBaF1Canvas->GetCanvas();
+        fCanvas1->cd();
+        fSumSignalCh[1].SetLineColor(6);
+        fSumSignalCh[1].Draw();
+        for(int i=0; i< fNCalPointsCh[1]; i++)
+        {
+            TLine *timeLine = new TLine(fCalibrationTimeCh[1]->at(i), fSumSignalCh[1].GetMinimum(), fCalibrationTimeCh[1]->at(i), fSumSignalCh[1].GetMaximum());
+            timeLine->SetLineColor(12);
+            timeLine->SetLineWidth(2);
+            timeLine->SetLineStyle(7);
+            timeLine->Draw("same");
+        }
+        fCanvas1->Modified();
+        fCanvas1->Update();
     }
     else if(fBaF1ScintCheckButton->IsOn() && fBaF1CherenkovCheckButton->IsOn()){
         fBaF1CountsNumberEntry->SetNumber(fNBaF1Double);
@@ -416,7 +445,7 @@ void MainWindow::findPeaks(vector<TH1D> &histSignalCh)
         }
         cout << endl;*/
 
-        histSignalCh[ch].Draw();
+     /*   histSignalCh[ch].Draw();
         hb->Draw("same");
         // hsumback->Draw("same");
         for(int i=0; i< fNCalPointsCh[ch]; i++)
@@ -429,7 +458,7 @@ void MainWindow::findPeaks(vector<TH1D> &histSignalCh)
         }
         TString nomefile = histSignalCh[ch].GetName();
         nomefile.Append(".png");
-        canv->SaveAs(nomefile);
+        canv->SaveAs(nomefile);*/
 
         //s->Clear();
     }
@@ -580,17 +609,16 @@ Int_t MainWindow::findInTimePeaks()
         {
             std::pair<Double_t, Double_t> inTimePeak;
 
-            fLogTextView->AddLine(Form("RunFile %s - Event %d - Channel %d - Found POINTS %d:"
-                                       , fRunFileName.Data(), fEvNumber, ch, fSignalPeaksCh[ch].size()));
-
 
             if(p >= fSignalPeaksCh[ch].size()){
                 break;
             }
 
-            while( fSignalPeaksCh[ch][p].first < fCalibrationTimeCh[ch]->at(i)){
+            while( fSignalPeaksCh[ch][p].first < fCalibrationTimeCh[ch]->at(i) && p < fSignalPeaksCh[ch].size()){
                 p++;
             }
+
+
             if(fabs(fCalibrationTimeCh[ch]->at(i)-fSignalPeaksCh[ch][p].first)< binWidth/2) {
                 foundPeak++;
                 peakIndex = p;
@@ -611,9 +639,6 @@ Int_t MainWindow::findInTimePeaks()
                     inTimePeak.first = fSignalPeaksCh[ch][peakIndex].first;
                     inTimePeak.second = fSignalPeaksCh[ch][peakIndex].second;
                     fInTimePeaksCh[ch].push_back(inTimePeak);
-                    fLogTextView->AddLine(Form("RunFile %s - Event %d - Channel %d - CalPoint %d:"
-                                               , fRunFileName.Data(), fEvNumber, ch, i));
-                    fLogTextView->AddLine("peak found!");
 
                 }
                 foundPeak = 0;
@@ -625,6 +650,7 @@ Int_t MainWindow::findInTimePeaks()
                 fLogTextView->AddLine("No peaks in calibration point!");
             }
         }
+        fLogTextView->AddLine(Form("p= %d",p));
 
         switch (ch){
         case 0:

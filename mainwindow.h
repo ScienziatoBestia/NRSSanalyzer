@@ -24,6 +24,8 @@ class TGCheckButton;
 class TGNumberEntryField;
 class TTree;
 class TFile;
+class TRootEmbeddedCanvas;
+
 #include <vector>
 
 class MainWindow {
@@ -88,6 +90,11 @@ private:
 
     TGTextView              *fLogTextView;
 
+
+    TRootEmbeddedCanvas *fBaF1Canvas;
+    TRootEmbeddedCanvas *fBaF2Canvas;
+    TRootEmbeddedCanvas *fBaF3Canvas;
+    TRootEmbeddedCanvas *fBaF4Canvas;
 
 
     char *openFileDialog();
