@@ -3,6 +3,7 @@
 
 #include <TQObject.h>
 #include <RQ_OBJECT.h>
+#include "constants.h"
 
 enum ETestCommandIdentifiers {
     M_START_CALIBRATION,
@@ -25,6 +26,7 @@ class TGNumberEntryField;
 class TTree;
 class TFile;
 class TRootEmbeddedCanvas;
+class TH1I;
 
 #include <vector>
 
@@ -66,11 +68,19 @@ private:
     int                     fNLySOScint;
 
     std::vector<TH1D>       fSumSignalCh;
+    std::vector<TH1D>       fSumCountsCh;
 
 
     
 
     TFile                   *fRunFile;
+    TTree                   *fRunTree;
+
+    float                   fNRSSdataBlock[kNCh][kNTimeSamples];
+
+    TH1I                    *fBaF1DoubleReadoutHist;
+    TH1I                    *fBaF2DoubleReadoutHist;
+    TH1I                    *fBaF3DoubleReadoutHist;
 
     TGMainFrame             *fMain;
     TGMenuBar               *fMenuBar;
@@ -97,18 +107,22 @@ private:
     TRootEmbeddedCanvas *fBaF4Canvas;
 
 
+
+
     char *openFileDialog();
     void findPeaks(std::vector<TH1D> &histSignalCh);
     Int_t findInTimePeaks();
     void createBaFGroup(TGCompositeFrame *p, const char *groupName, TGCheckButton *& fBaFScintCheckButton,
                         TGNumberEntryField *& fBaFCountsNumberEntry, TGCheckButton *& fBaFCherenkovCheckButton,
                         TGNumberEntryField *& fBaFRateNumberEntry);
-    void readCalibration();
+    int readCalibration();
     void openRunFile();
     void closeRunFile();
     void analyzeEvent(int evNumber);
     int analyzeDetector(int scintCh, int cherCh);
     void visualization();
+    void drawBaFCanvas(TRootEmbeddedCanvas *canvas, int chIndex);
+    void drawDoubleReadoutHist(TRootEmbeddedCanvas *canvas, TH1I *histToDraw);
 public:
     MainWindow(const TGWindow *p,UInt_t w,UInt_t h);
     virtual ~MainWindow();
@@ -117,6 +131,7 @@ public:
 
     //slots
     void onStartButtonClicked();
+    void onDrawRefreshButtonClicked();
     void handleMenu(Int_t id);
     void close();
 };

@@ -69,8 +69,11 @@ MainWindow::MainWindow(const TGWindow *p,UInt_t w,UInt_t h)
 
     fSumSignalCh.reserve(kNCh);
     for(int ch=0; ch < kNCh; ch++){
-        TH1D temp(Form("SumSignal%d", ch), "", kNTimeSamples, 0., (Double_t) kNTimeSamples);
+        TH1D temp(Form("SumSignal%d", ch), Form("BaF %d",ch/2+1), kNTimeSamples, 0., (Double_t) kNTimeSamples);
+        TH1D temp1(Form("SumCounts%d", ch), Form("BaF %d",ch/2+1), kNTimeSamples, 0., (Double_t) kNTimeSamples);
+
         fSumSignalCh.push_back(temp);
+        fSumCountsCh.push_back(temp1);
     }
 
 
@@ -109,11 +112,21 @@ MainWindow::MainWindow(const TGWindow *p,UInt_t w,UInt_t h)
     TGHorizontalFrame *fHorizontalFrame0 = new TGHorizontalFrame(fMain);
     TGVerticalFrame *fVerticalFrame1 = new TGVerticalFrame(fHorizontalFrame0);
 
-    //Start Button
-    TGTextButton *fStartButton = new TGTextButton(fVerticalFrame1, "Start !");
+    //Start and Draw button
+    TGHorizontalFrame *horizontalFrame2 = new TGHorizontalFrame(fVerticalFrame1);
+    fVerticalFrame1->AddFrame(horizontalFrame2, new TGLayoutHints(kLHintsCenterX | kLHintsTop |
+                                                                  kLHintsExpandX | kLHintsExpandY ,2,2,2,2));
+
+    TGTextButton *fStartButton = new TGTextButton(horizontalFrame2, "Start !");
     fStartButton->Connect("Clicked()", "MainWindow", this, "onStartButtonClicked()");
-    fVerticalFrame1->AddFrame(fStartButton, new TGLayoutHints(kLHintsCenterX | kLHintsTop |
+    horizontalFrame2->AddFrame(fStartButton, new TGLayoutHints(kLHintsCenterX | kLHintsTop |
                                                               kLHintsExpandX | kLHintsExpandY ,2,2,2,2));
+
+    TGTextButton *drawRefreshButton = new TGTextButton(horizontalFrame2, "Draw Refresh");
+    drawRefreshButton->Connect("Clicked()", "MainWindow", this, "onDrawRefreshButtonClicked()");
+    horizontalFrame2->AddFrame(drawRefreshButton, new TGLayoutHints(kLHintsCenterX | kLHintsTop |
+                                                              kLHintsExpandX | kLHintsExpandY ,2,2,2,2));
+
     //end Start Button
 
 
@@ -186,6 +199,8 @@ MainWindow::MainWindow(const TGWindow *p,UInt_t w,UInt_t h)
     fMain->MapWindow();
 
 
+    fCalibrationFileName = "./calibration_file.root";
+    fRunFileName = "./RunFile.root";
 
 }
 
@@ -290,24 +305,76 @@ void MainWindow::onStartButtonClicked()
 
     //start analysis
     //reading calibration file
-    readCalibration();
+    if(readCalibration()){
+        return;
+    }
 
     openRunFile();
 
-    //to re do 100 times
-    fEvNumber = 1;
-    analyzeEvent(fEvNumber);
-    findInTimePeaks();
 
-    fNBaF1Double += analyzeDetector(0, 1);
-    fNBaF2Double += analyzeDetector(2, 3);
-    fNBaF3Double += analyzeDetector(4, 5);
+    for(int eventIndex=0; eventIndex < fRunTree->GetEntries(); eventIndex++){
+        fEvNumber = eventIndex;
+        analyzeEvent(fEvNumber);
+        findInTimePeaks();
+
+        fNBaF1Double += analyzeDetector(0, 1);
+        fNBaF2Double += analyzeDetector(2, 3);
+        fNBaF3Double += analyzeDetector(4, 5);
+    }
 
     visualization();
+
+    closeRunFile();
 
 
 
 }
+
+void MainWindow::onDrawRefreshButtonClicked()
+{
+    visualization();
+
+}
+
+void MainWindow::drawBaFCanvas(TRootEmbeddedCanvas *canvas, int chIndex)
+{
+    TCanvas *fCanvas1 = canvas->GetCanvas();
+    fCanvas1->cd();
+    fSumSignalCh[chIndex].SetLineColor(2);
+    fSumSignalCh[chIndex].Draw();
+    fSumCountsCh[chIndex].SetFillColor(3);
+    fSumCountsCh[chIndex].SetFillStyle(4);
+    fSumCountsCh[chIndex].Draw("same");
+    for(int i=0; i< fNCalPointsCh[chIndex]; i++)
+    {
+        TLine *timeLine = new TLine(fCalibrationTimeCh[chIndex]->at(i), fSumSignalCh[chIndex].GetMinimum(), fCalibrationTimeCh[chIndex]->at(i), fSumSignalCh[chIndex].GetMaximum());
+        timeLine->SetLineColor(12);
+        timeLine->SetLineWidth(1);
+        timeLine->SetLineStyle(7);
+        timeLine->Draw("same");
+    }
+
+    fCanvas1->Modified();
+    fCanvas1->Update();
+}
+
+void MainWindow::drawDoubleReadoutHist(TRootEmbeddedCanvas *canvas, TH1I * histToDraw)
+{
+
+    TCanvas *fCanvas1 = canvas->GetCanvas();
+    fCanvas1->cd();
+    for(int i=0; i< histToDraw->GetNbinsX(); ++i){
+        histToDraw->GetXaxis()->SetBinLabel(i+1, Form("%d", i+1));
+    }
+    histToDraw->SetFillColor(4);
+    histToDraw->GetYaxis()->SetRangeUser(0,histToDraw->GetMaximum()*1.1);
+    histToDraw->SetBarWidth(0.5);
+    histToDraw->SetBarOffset(0.25);
+    histToDraw->Draw("B");
+    fCanvas1->Modified();
+    fCanvas1->Update();
+}
+
 
 void MainWindow::visualization()
 {
@@ -315,68 +382,50 @@ void MainWindow::visualization()
     //Baf1 visualization
     if(fBaF1ScintCheckButton->IsOn() && !fBaF1CherenkovCheckButton->IsOn() ){
         fBaF1CountsNumberEntry->SetNumber(fNBaF1Scint);
-        TCanvas *fCanvas1 = fBaF1Canvas->GetCanvas();
-        fCanvas1->cd();
-        fSumSignalCh[0].SetLineColor(2);
-        fSumSignalCh[0].Draw();
-        for(int i=0; i< fNCalPointsCh[0]; i++)
-        {
-            TLine *timeLine = new TLine(fCalibrationTimeCh[0]->at(i), fSumSignalCh[0].GetMinimum(), fCalibrationTimeCh[0]->at(i), fSumSignalCh[0].GetMaximum());
-            timeLine->SetLineColor(12);
-            timeLine->SetLineWidth(2);
-            timeLine->SetLineStyle(7);
-            timeLine->Draw("same");
-        }
-
-        fCanvas1->Modified();
-        fCanvas1->Update();
+        drawBaFCanvas(fBaF1Canvas, 0);
     }
     else if(!fBaF1ScintCheckButton->IsOn() && fBaF1CherenkovCheckButton->IsOn()){
         fBaF1CountsNumberEntry->SetNumber(fNBaF1Cher);
-        TCanvas *fCanvas1 = fBaF1Canvas->GetCanvas();
-        fCanvas1->cd();
-        fSumSignalCh[1].SetLineColor(6);
-        fSumSignalCh[1].Draw();
-        for(int i=0; i< fNCalPointsCh[1]; i++)
-        {
-            TLine *timeLine = new TLine(fCalibrationTimeCh[1]->at(i), fSumSignalCh[1].GetMinimum(), fCalibrationTimeCh[1]->at(i), fSumSignalCh[1].GetMaximum());
-            timeLine->SetLineColor(12);
-            timeLine->SetLineWidth(2);
-            timeLine->SetLineStyle(7);
-            timeLine->Draw("same");
-        }
-        fCanvas1->Modified();
-        fCanvas1->Update();
+        drawBaFCanvas(fBaF1Canvas, 1);
     }
     else if(fBaF1ScintCheckButton->IsOn() && fBaF1CherenkovCheckButton->IsOn()){
         fBaF1CountsNumberEntry->SetNumber(fNBaF1Double);
+        drawDoubleReadoutHist(fBaF1Canvas, fBaF1DoubleReadoutHist);
+
     }
 
     //BaF2 visualization
     if(fBaF2ScintCheckButton->IsOn() && !fBaF2CherenkovCheckButton->IsOn()){
         fBaF2CountsNumberEntry->SetNumber(fNBaF2Scint);
+        drawBaFCanvas(fBaF2Canvas, 2);
     }
     else if(!fBaF2ScintCheckButton->IsOn() && fBaF2CherenkovCheckButton->IsOn()){
         fBaF2CountsNumberEntry->SetNumber(fNBaF2Cher);
+        drawBaFCanvas(fBaF2Canvas, 3);
     }
     else if(fBaF2ScintCheckButton->IsOn() && fBaF2CherenkovCheckButton->IsOn()){
         fBaF2CountsNumberEntry->SetNumber(fNBaF2Double);
+        drawDoubleReadoutHist(fBaF2Canvas, fBaF2DoubleReadoutHist);
     }
 
     //BaF3 visualization
     if(fBaF3ScintCheckButton->IsOn() && !fBaF3CherenkovCheckButton->IsOn()){
         fBaF3CountsNumberEntry->SetNumber(fNBaF3Scint);
+        drawBaFCanvas(fBaF3Canvas, 4);
     }
     else if(!fBaF3ScintCheckButton->IsOn() && fBaF3CherenkovCheckButton->IsOn()){
         fBaF3CountsNumberEntry->SetNumber(fNBaF3Cher);
+        drawBaFCanvas(fBaF3Canvas, 5);
     }
     else if(fBaF3ScintCheckButton->IsOn() && fBaF3CherenkovCheckButton->IsOn()){
         fBaF3CountsNumberEntry->SetNumber(fNBaF3Double);
+        drawDoubleReadoutHist(fBaF3Canvas, fBaF3DoubleReadoutHist);
     }
 
     //BaF4 visualization
     if(fBaF4ScintCheckButton->IsOn() && !fBaF4CherenkovCheckButton->IsOn()){
         fBaF4CountsNumberEntry->SetNumber(fNBaF4Scint);
+        drawBaFCanvas(fBaF4Canvas, 6);
     }
     else if(!fBaF4ScintCheckButton->IsOn() && fBaF4CherenkovCheckButton->IsOn()){
         fBaF4CountsNumberEntry->SetNumber(0);
@@ -400,6 +449,12 @@ int MainWindow::analyzeDetector(int scintCh, int cherCh)
         if(fInTimePeaksCh[scintCh][i].second > scintThres &&
                 fInTimePeaksCh[cherCh][i].second > cherThres){
             goodCounts++;
+            if(scintCh == 0)
+                fBaF1DoubleReadoutHist->Fill(i+1);
+            else if (scintCh == 2)
+                fBaF2DoubleReadoutHist->Fill(i+1);
+            else if (scintCh == 4)
+                fBaF3DoubleReadoutHist->Fill(i+1);
         }
     }
     return goodCounts;
@@ -408,7 +463,7 @@ int MainWindow::analyzeDetector(int scintCh, int cherCh)
 //this function find peaks in the histSignalCH (for each channel) and fill fSignalPeaksCh
 void MainWindow::findPeaks(vector<TH1D> &histSignalCh)
 {
-    TCanvas *canv = new TCanvas("canv", "Titolo", 3200, 2400);
+    //TCanvas *canv = new TCanvas("canv", "Titolo", 3200, 2400);
     for(int ch = 0; ch < kNCh; ch++){
         int nCalibrationPeaksCh = fCalibrationTimeCh[ch]->size();
         //set range where to look for peaks
@@ -428,6 +483,7 @@ void MainWindow::findPeaks(vector<TH1D> &histSignalCh)
         temp.reserve(nfound);
         for(int i=0; i< nfound; i++){                           //Possible time consuming !!!!
             temp.push_back(s.GetPositionX()[i]);
+            fSumCountsCh[ch].Fill(s.GetPositionX()[i]);
         }
         sort(temp.begin() , temp.end());
 
@@ -471,10 +527,10 @@ void MainWindow::findPeaks(vector<TH1D> &histSignalCh)
 
 
 
-void MainWindow::readCalibration(){
+int MainWindow::readCalibration(){
     if(fCalibrationFileName == ""){
         fLogTextView->AddLine("Please set a calibration file, run aborted");
-        return;
+        return -1;
     }
     TFile calibrationFile(fCalibrationFileName, "READ");
     TTree *calibrationTree = (TTree *) calibrationFile.Get("calibration_tree");
@@ -513,6 +569,18 @@ void MainWindow::readCalibration(){
         fInTimePeaksCh[ch].reserve(fNCalPointsCh[ch]);
     }
 
+    int calpoint = fNCalPointsCh[0];
+    for(int i=1; i< kNCh -1; i++){
+        if( calpoint != fNCalPointsCh[i]){
+            fLogTextView->AddLine("ERROR: calibration file gives different number of calibration points between channels");
+            return -1;
+        }
+    }
+
+    fBaF1DoubleReadoutHist = new TH1I ("BaF1DoubleReadoutHist", "BaF 1", fNCalPointsCh[0], 1, fNCalPointsCh[0]+1);
+    fBaF2DoubleReadoutHist = new TH1I ("BaF2DoubleReadoutHist", "BaF 2", fNCalPointsCh[0], 1, fNCalPointsCh[0]+1);
+    fBaF3DoubleReadoutHist = new TH1I ("BaF3DoubleReadoutHist", "BaF 3", fNCalPointsCh[0], 1, fNCalPointsCh[0]+1);
+    return 0;
 }
 
 void MainWindow::openRunFile()
@@ -522,6 +590,11 @@ void MainWindow::openRunFile()
         return;
     }
     fRunFile = new TFile(fRunFileName ,"READ");
+
+    fRunTree = (TTree *) fRunFile->Get("rawdata");
+    fRunTree->SetBranchAddress("dataNRSS", fNRSSdataBlock);
+
+
 
 }
 
@@ -533,18 +606,14 @@ void MainWindow::closeRunFile()
 
 void MainWindow::analyzeEvent(int evNumber)
 {
-    //read run file
-    if(!fRunFile){
-        openRunFile();
-        return;
+    for(int i =0 ; i<kNCh; i++){
+    fInTimePeaksCh[i].clear();
     }
 
-    //read data block from file
-    float fNRSSdataBlock[kNCh][kNTimeSamples];
+    fLogTextView->AddLine(Form("Analyzing event %d...", fEvNumber));
 
-    TTree *tree = (TTree *) fRunFile->Get("rawdata");
-    tree->SetBranchAddress("dataNRSS", fNRSSdataBlock);
-    tree->GetEntry(evNumber);
+
+    fRunTree->GetEntry(evNumber);
 
 
     //matrix of the peak instants for each channel
@@ -645,12 +714,15 @@ Int_t MainWindow::findInTimePeaks()
             }
             else{
                 peakNotFound++;
-                fLogTextView->AddLine(Form("RunFile %s - Event %d - Channel %d - CalPoint %d:"
-                                           , fRunFileName.Data(), fEvNumber, ch, i));
-                fLogTextView->AddLine("No peaks in calibration point!");
+                inTimePeak.first = -1.;
+                inTimePeak.second = -1.;
+                fInTimePeaksCh[ch].push_back(inTimePeak);
+
+               // fLogTextView->AddLine(Form("RunFile %s - Event %d - Channel %d - CalPoint %d:"
+               //                            , fRunFileName.Data(), fEvNumber, ch, i));
+               // fLogTextView->AddLine("No peaks in calibration point!");
             }
         }
-        fLogTextView->AddLine(Form("p= %d",p));
 
         switch (ch){
         case 0:

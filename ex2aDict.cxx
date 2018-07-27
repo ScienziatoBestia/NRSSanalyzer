@@ -55,7 +55,7 @@ namespace ROOT {
       ::MainWindow *ptr = 0;
       static ::TVirtualIsAProxy* isa_proxy = new ::TIsAProxy(typeid(::MainWindow));
       static ::ROOT::TGenericClassInfo 
-         instance("MainWindow", "mainwindow.h", 22,
+         instance("MainWindow", "mainwindow.h", 32,
                   typeid(::MainWindow), ::ROOT::Internal::DefineBehavior(ptr, ptr),
                   &MainWindow_Dictionary, isa_proxy, 0,
                   sizeof(::MainWindow) );
